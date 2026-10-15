@@ -2,14 +2,14 @@
 # MAGIC %md
 # MAGIC # Config-driven pipeline factory
 # MAGIC
-# MAGIC This notebook turns `config.json` into a complete Databricks bundle.
+# MAGIC This notebook turns `config.yml` into a complete Databricks bundle.
 # MAGIC
 # MAGIC It demonstrates a deliberately simple factory pattern:
 # MAGIC
-# MAGIC 1. Read the source-system and pipeline configuration.
+# MAGIC 1. Read the source-system and workflow configuration.
 # MAGIC 2. Fill a small set of pre-built templates.
-# MAGIC 3. Generate one explicitly named Bronze/Silver pipeline and scheduled Job
-# MAGIC    per pipeline entry.
+# MAGIC 3. Generate one explicitly named Databricks Pipeline and Databricks Job
+# MAGIC    per workflow.
 # MAGIC 4. Write the deployable bundle under `generated/`.
 # MAGIC
 # MAGIC The notebook prints progress as each part of the bundle is created.
@@ -19,7 +19,7 @@
 # MAGIC ## 1. Locate the Git folder
 # MAGIC
 # MAGIC The notebook is stored at the root of the Databricks Git folder, alongside
-# MAGIC `config.json` and the `templates/` directory. When the same file is run
+# MAGIC `config.yml` and the `templates/` directory. When the same file is run
 # MAGIC locally, `__file__` identifies that directory instead.
 
 # COMMAND ----------
@@ -30,9 +30,11 @@ import re
 import shutil
 from pathlib import Path
 
+import yaml
+
 
 REPO_ROOT = Path(__file__).resolve().parent if "__file__" in globals() else Path.cwd()
-CONFIG_PATH = REPO_ROOT / "config.json"
+CONFIG_PATH = REPO_ROOT / "config.yml"
 TEMPLATE_ROOT = REPO_ROOT / "templates"
 
 print(f"Repository root : {REPO_ROOT}")
@@ -41,11 +43,11 @@ print(f"Templates       : {TEMPLATE_ROOT}")
 
 # COMMAND ----------
 # MAGIC %md
-# MAGIC ## 2. Load and inspect `config.json`
+# MAGIC ## 2. Load and inspect `config.yml`
 # MAGIC
-# MAGIC The configuration names the source system, every pipeline, and every table
-# MAGIC that will be created. This cell checks the few relationships on which the
-# MAGIC templates rely, then prints a readable summary of the planned data flows.
+# MAGIC Each workflow contains a Databricks Pipeline and the Databricks Job that
+# MAGIC schedules it. YAML is loaded directly into normal Python dictionaries and
+# MAGIC lists, which are then validated before any files are generated.
 
 # COMMAND ----------
 
@@ -54,21 +56,32 @@ VALID_NAME = re.compile(r"^[a-z][a-z0-9_]*$")
 
 
 def load_config() -> dict:
-    config = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
+    config = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8"))
 
-    required_sections = {"bundle", "source_system", "targets", "pipelines"}
+    required_sections = {"bundle", "source_system", "targets", "workflows"}
     missing_sections = required_sections - config.keys()
     if missing_sections:
         raise ValueError(f"Missing config sections: {sorted(missing_sections)}")
-    if not config["pipelines"]:
-        raise ValueError("At least one pipeline is required")
+    if not config["workflows"]:
+        raise ValueError("At least one workflow is required")
 
-    resource_keys = [
-        pipeline.get("resource_key", "") for pipeline in config["pipelines"]
+    workflow_names = [workflow.get("name", "") for workflow in config["workflows"]]
+    pipeline_keys = [
+        workflow.get("pipeline", {}).get("resource_key", "")
+        for workflow in config["workflows"]
     ]
-    names = [config["bundle"].get("name", ""), *resource_keys]
-    for pipeline in config["pipelines"]:
-        tables = pipeline.get("tables", {})
+    job_keys = [
+        workflow.get("job", {}).get("resource_key", "")
+        for workflow in config["workflows"]
+    ]
+    names = [
+        config["bundle"].get("name", ""),
+        *workflow_names,
+        *pipeline_keys,
+        *job_keys,
+    ]
+    for workflow in config["workflows"]:
+        tables = workflow.get("pipeline", {}).get("tables", {})
         names.extend(
             tables.get(layer, {}).get("name", "") for layer in ("bronze", "silver")
         )
@@ -77,10 +90,15 @@ def load_config() -> dict:
     if invalid_names:
         raise ValueError(f"Invalid bundle, resource, or table names: {invalid_names}")
 
-    if len(resource_keys) != len(set(resource_keys)):
+    if len(workflow_names) != len(set(workflow_names)):
+        raise ValueError("Workflow names must be unique")
+    if len(pipeline_keys) != len(set(pipeline_keys)):
         raise ValueError("Pipeline resource_key values must be unique")
+    if len(job_keys) != len(set(job_keys)):
+        raise ValueError("Job resource_key values must be unique")
 
-    for pipeline in config["pipelines"]:
+    for workflow in config["workflows"]:
+        pipeline = workflow["pipeline"]
         bronze = pipeline["tables"]["bronze"]
         silver = pipeline["tables"]["silver"]
         table_types = {bronze.get("type"), silver.get("type")}
@@ -88,7 +106,7 @@ def load_config() -> dict:
             raise ValueError("This demo template supports streaming_table entries only")
         if silver.get("reads_from") != bronze["name"]:
             raise ValueError(
-                f"{pipeline['resource_key']}: silver.reads_from must equal bronze.name"
+                f"{workflow['name']}: silver.reads_from must equal bronze.name"
             )
 
     return config
@@ -98,23 +116,29 @@ CONFIG = load_config()
 BUNDLE = CONFIG["bundle"]
 SOURCE_SYSTEM = CONFIG["source_system"]
 TARGETS = CONFIG["targets"]
-PIPELINES = CONFIG["pipelines"]
+WORKFLOWS = CONFIG["workflows"]
 
 print(
     "Source system : "
     f"{SOURCE_SYSTEM['type']} at "
     f"{SOURCE_SYSTEM['catalog']}.{SOURCE_SYSTEM['schema']}.{SOURCE_SYSTEM['volume']}"
 )
-print(f"Loaded bundle '{BUNDLE['name']}' with {len(PIPELINES)} pipelines:")
-for pipeline in PIPELINES:
+print(f"Loaded bundle '{BUNDLE['name']}' with {len(WORKFLOWS)} workflows:")
+for workflow in WORKFLOWS:
+    pipeline = workflow["pipeline"]
+    job = workflow["job"]
     bronze = pipeline["tables"]["bronze"]
     silver = pipeline["tables"]["silver"]
-    schedule = pipeline["schedule"]
+    schedule = job["schedule"]
+    print(f"  • {workflow['name']}")
     print(
-        f"  • {pipeline['resource_key']}: "
-        f"{bronze['name']} → {silver['name']} | "
-        f"source={bronze['source']['path']} | "
-        f"schedule={schedule['quartz_cron_expression']} ({schedule['timezone_id']})"
+        f"      Pipeline {pipeline['resource_key']}: "
+        f"{bronze['name']} → {silver['name']} "
+        f"from {bronze['source']['path']}"
+    )
+    print(
+        f"      Job {job['resource_key']}: "
+        f"{schedule['quartz_cron_expression']} ({schedule['timezone_id']})"
     )
 
 # COMMAND ----------
@@ -122,7 +146,8 @@ for pipeline in PIPELINES:
 # MAGIC ## 3. Define the small template engine
 # MAGIC
 # MAGIC Templates contain the fixed, pre-approved shape of the bundle and pipeline
-# MAGIC code. The factory replaces uppercase placeholders such as `{{RESOURCE_KEY}}`.
+# MAGIC code. The factory replaces named placeholders such as
+# MAGIC `{{PIPELINE_RESOURCE_KEY}}`.
 # MAGIC This keeps the generation logic visible and avoids introducing a templating
 # MAGIC framework for four small files.
 
@@ -131,12 +156,15 @@ for pipeline in PIPELINES:
 PLACEHOLDER = re.compile(r"\{\{([A-Z][A-Z0-9_]*)\}\}")
 
 
-def render(template_name: str, values: dict[str, str]) -> str:
+def populate_template(
+    template_name: str,
+    placeholder_values: dict[str, str],
+) -> str:
     """Load a template and replace its `{{PLACEHOLDER}}` values."""
     template_path = TEMPLATE_ROOT / f"{template_name}.tmpl"
     text = template_path.read_text(encoding="utf-8")
 
-    for name, value in values.items():
+    for name, value in placeholder_values.items():
         text = text.replace(f"{{{{{name}}}}}", value)
 
     unresolved = sorted(set(PLACEHOLDER.findall(text)))
@@ -184,7 +212,7 @@ for template_name in template_names:
 # MAGIC ## 4. Prepare the generated bundle folder
 # MAGIC
 # MAGIC `generated/<bundle-name>/` contains generated output only. Recreating the
-# MAGIC directory on every run prevents files for removed pipelines from being left
+# MAGIC directory on every run prevents files for removed workflows from being left
 # MAGIC behind.
 
 # COMMAND ----------
@@ -209,9 +237,9 @@ print(f"Created clean bundle folder: {BUNDLE_ROOT}")
 # COMMAND ----------
 
 # `json.dumps` safely quotes strings; JSON strings are also valid YAML strings.
-bundle_yaml = render(
-    "databricks.yml",
-    {
+bundle_yaml = populate_template(
+    template_name="databricks.yml",
+    placeholder_values={
         "BUNDLE_NAME": BUNDLE["name"],
         "SOURCE_CATALOG": json.dumps(SOURCE_SYSTEM["catalog"]),
         "SOURCE_SCHEMA": json.dumps(SOURCE_SYSTEM["schema"]),
@@ -231,9 +259,9 @@ print("✓ Generated databricks.yml")
 
 # COMMAND ----------
 # MAGIC %md
-# MAGIC ## 6. Generate each configured pipeline
+# MAGIC ## 6. Generate each configured workflow
 # MAGIC
-# MAGIC For every pipeline entry this cell creates three files:
+# MAGIC For every workflow this cell creates three files:
 # MAGIC
 # MAGIC - A pipeline resource containing one Bronze and one Silver table.
 # MAGIC - A Lakeflow Job resource that runs the pipeline on its configured schedule.
@@ -245,35 +273,39 @@ print("✓ Generated databricks.yml")
 
 # COMMAND ----------
 
-def generate_pipeline(pipeline: dict) -> list[Path]:
-    resource_key = pipeline["resource_key"]
+def generate_workflow(workflow: dict) -> list[Path]:
+    pipeline = workflow["pipeline"]
+    job = workflow["job"]
+    pipeline_key = pipeline["resource_key"]
+    job_key = job["resource_key"]
     bronze = pipeline["tables"]["bronze"]
     silver = pipeline["tables"]["silver"]
     source = bronze["source"]
-    schedule = pipeline["schedule"]
+    schedule = job["schedule"]
 
-    pipeline_path = BUNDLE_ROOT / f"resources/{resource_key}.pipeline.yml"
+    pipeline_path = BUNDLE_ROOT / f"resources/{pipeline_key}.pipeline.yml"
     write(
         pipeline_path,
-        render(
-            "pipeline.yml",
-            {
-                "RESOURCE_KEY": resource_key,
-                "DISPLAY_NAME": json.dumps(pipeline["display_name"]),
+        populate_template(
+            template_name="pipeline.yml",
+            placeholder_values={
+                "PIPELINE_RESOURCE_KEY": pipeline_key,
+                "PIPELINE_DISPLAY_NAME": json.dumps(pipeline["display_name"]),
                 "SOURCE_SUBPATH": source["path"].strip("/"),
             },
         ),
     )
 
     # Pipelines do not contain schedules, so a Lakeflow Job triggers each pipeline.
-    job_path = BUNDLE_ROOT / f"resources/{resource_key}.job.yml"
+    job_path = BUNDLE_ROOT / f"resources/{job_key}.job.yml"
     write(
         job_path,
-        render(
-            "job.yml",
-            {
-                "RESOURCE_KEY": resource_key,
-                "JOB_DISPLAY_NAME": json.dumps(f"{pipeline['display_name']} schedule"),
+        populate_template(
+            template_name="job.yml",
+            placeholder_values={
+                "JOB_RESOURCE_KEY": job_key,
+                "PIPELINE_RESOURCE_KEY": pipeline_key,
+                "JOB_DISPLAY_NAME": json.dumps(job["display_name"]),
                 "CRON_EXPRESSION": json.dumps(schedule["quartz_cron_expression"]),
                 "TIMEZONE_ID": json.dumps(schedule["timezone_id"]),
             },
@@ -287,13 +319,13 @@ def generate_pipeline(pipeline: dict) -> list[Path]:
     source_options.setdefault("rescuedDataColumn", "_rescued_data")
 
     transformation_path = (
-        BUNDLE_ROOT / f"src/pipelines/{resource_key}/transformations/pipeline.py"
+        BUNDLE_ROOT / f"src/pipelines/{pipeline_key}/transformations/pipeline.py"
     )
     write(
         transformation_path,
-        render(
-            "dataset.py",
-            {
+        populate_template(
+            template_name="dataset.py",
+            placeholder_values={
                 "BRONZE_TABLE_REPR": repr(bronze["name"]),
                 "BRONZE_DESCRIPTION_REPR": repr(bronze["description"]),
                 "SILVER_TABLE_REPR": repr(silver["name"]),
@@ -311,11 +343,15 @@ def generate_pipeline(pipeline: dict) -> list[Path]:
     return [pipeline_path, job_path, transformation_path]
 
 
-for pipeline in PIPELINES:
-    generated_paths = generate_pipeline(pipeline)
+for workflow in WORKFLOWS:
+    generated_paths = generate_workflow(workflow)
+    pipeline = workflow["pipeline"]
+    job = workflow["job"]
     bronze = pipeline["tables"]["bronze"]["name"]
     silver = pipeline["tables"]["silver"]["name"]
-    print(f"✓ Generated {pipeline['display_name']}: {bronze} → {silver}")
+    print(f"✓ Generated workflow '{workflow['name']}'")
+    print(f"    Pipeline: {pipeline['resource_key']} ({bronze} → {silver})")
+    print(f"    Job:      {job['resource_key']}")
     for path in generated_paths:
         print(f"    {path.relative_to(BUNDLE_ROOT)}")
 

@@ -1,7 +1,7 @@
-# GENERATED FILE. Edit config.json or templates, then rerun factory.py.
+# GENERATED FILE. Edit config.yml or templates, then rerun factory.py.
 resources:
   jobs:
-    {{RESOURCE_KEY}}_schedule:
+    {{JOB_RESOURCE_KEY}}:
       name: {{JOB_DISPLAY_NAME}}
       max_concurrent_runs: 1
       schedule:
@@ -9,7 +9,7 @@ resources:
         timezone_id: {{TIMEZONE_ID}}
         pause_status: ${var.schedule_pause_status}
       tasks:
-        - task_key: run_{{RESOURCE_KEY}}
+        - task_key: run_{{PIPELINE_RESOURCE_KEY}}
           pipeline_task:
-            pipeline_id: ${resources.pipelines.{{RESOURCE_KEY}}.id}
+            pipeline_id: ${resources.pipelines.{{PIPELINE_RESOURCE_KEY}}.id}
             full_refresh: false

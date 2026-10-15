@@ -1,4 +1,4 @@
-# GENERATED FILE. Edit config.json or templates, then rerun factory.py.
+# GENERATED FILE. Edit config.yml or templates, then rerun factory.py.
 from pyspark import pipelines as dp
 from pyspark.sql import functions as F
 

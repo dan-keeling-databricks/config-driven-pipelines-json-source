@@ -1,7 +1,7 @@
 # Config-driven Databricks ingestion DAB
 
 This project demonstrates a small Databricks notebook factory that turns one
-readable `config.json` into a complete Declarative Automation Bundle (DAB).
+readable `config.yml` into a complete Declarative Automation Bundle (DAB).
 
 ## Work in the Databricks UI
 
@@ -14,7 +14,7 @@ https://github.com/dan-keeling-databricks/config-driven-pipelines-json-source
 Then use this workflow in the Databricks UI:
 
 1. Run `upload_mock_data.py` once to create and populate the landing volume.
-2. Edit `config.json` in the Git folder.
+2. Edit `config.yml` in the Git folder.
 3. Open `factory.py`; Databricks recognizes it as a source-format Python notebook.
 4. Attach compute and run the notebook.
 5. Review the regenerated files under `generated/source_system_ingestion_demo/`.
@@ -30,66 +30,65 @@ The top-level sections have distinct responsibilities:
 - `bundle` names the generated DAB.
 - `source_system` identifies the shared JSON landing volume.
 - `targets` identifies each environment's output catalog, schema, and schedule state.
-- `pipelines` lists the independent pipelines and every table each one creates.
+- `workflows` lists the ingestion workflows to generate.
 
-Each pipeline follows this visible shape:
+Each workflow explicitly separates the Databricks Pipeline that creates the
+tables from the Databricks Job that schedules that pipeline:
 
-```json
-{
-  "resource_key": "customers_pipeline",
-  "display_name": "Customers ingestion",
-  "schedule": {
-    "quartz_cron_expression": "0 0 * * * ?",
-    "timezone_id": "Europe/London"
-  },
-  "tables": {
-    "bronze": {
-      "name": "bronze_customers",
-      "type": "streaming_table",
-      "description": "Raw customer records",
-      "source": {
-        "path": "customers",
-        "schema_hints": "customer_id STRING, ...",
-        "options": {}
-      }
-    },
-    "silver": {
-      "name": "silver_customers",
-      "type": "streaming_table",
-      "description": "Cleansed customer master data",
-      "reads_from": "bronze_customers",
-      "select": ["trim(customer_id) AS customer_id"],
-      "expectations": {
-        "warn": {},
-        "drop": {},
-        "fail": {}
-      }
-    }
-  }
-}
+```yaml
+workflows:
+  - name: customers_ingestion
+    pipeline:
+      resource_key: customers_pipeline
+      display_name: Customers ingestion
+      tables:
+        bronze:
+          name: bronze_customers
+          type: streaming_table
+          description: Raw customer records
+          source:
+            path: customers
+            schema_hints: customer_id STRING, ...
+            options: {}
+        silver:
+          name: silver_customers
+          type: streaming_table
+          description: Cleansed customer master data
+          reads_from: bronze_customers
+          select:
+            - trim(customer_id) AS customer_id
+          expectations:
+            warn: {}
+            drop: {}
+            fail: {}
+    job:
+      resource_key: customers_pipeline_schedule
+      display_name: Customers ingestion schedule
+      schedule:
+        quartz_cron_expression: "0 0 * * * ?"
+        timezone_id: Europe/London
 ```
 
-The factory copies `bronze.name`, `silver.name`, and `silver.reads_from`
-directly into the generated pipeline. It does not infer table names.
+The factory copies the Pipeline key, Job key, table names, dependency, and
+schedule directly from the workflow. It does not infer those resource names.
+`yaml.safe_load()` parses the YAML directly into ordinary Python dictionaries
+and lists, so no intermediate JSON conversion is needed.
 
-The initial configuration generates three independent Lakeflow Spark
-Declarative Pipelines:
+The initial configuration generates three workflows:
 
-| Pipeline resource | Tables created | Schedule |
+| Workflow | Pipeline tables | Scheduled Job |
 |---|---|---|
-| `customers_pipeline` | `bronze_customers` → `silver_customers` | Hourly |
-| `orders_pipeline` | `bronze_orders` → `silver_orders` | Every four hours at :15 |
-| `products_pipeline` | `bronze_products` → `silver_products` | Daily at 02:30 Europe/London |
-
-Each pipeline has a separate Lakeflow Job resource because schedules are Job
-resources, not pipeline properties.
+| `customers_ingestion` | `bronze_customers` → `silver_customers` | Hourly |
+| `orders_ingestion` | `bronze_orders` → `silver_orders` | Every four hours at :15 |
+| `products_ingestion` | `bronze_products` → `silver_products` | Daily at 02:30 Europe/London |
 
 ## Generate the bundle
 
 Open `factory.py` as a Databricks notebook inside a Git folder and run all
-cells. The same file can also be run locally:
+cells. To run the same file locally, first install its one dependency:
 
 ```bash
+python3 -m pip install -r requirements.txt
 python3 factory.py
 ```
 
@@ -100,17 +99,17 @@ generated/source_system_ingestion_demo/
 ├── databricks.yml
 ├── resources/
 │   ├── customers_pipeline.pipeline.yml
-│   ├── customers_pipeline.job.yml
+│   ├── customers_pipeline_schedule.job.yml
 │   ├── orders_pipeline.pipeline.yml
-│   ├── orders_pipeline.job.yml
+│   ├── orders_pipeline_schedule.job.yml
 │   ├── products_pipeline.pipeline.yml
-│   └── products_pipeline.job.yml
-└── src/pipelines/<resource_key>/transformations/pipeline.py
+│   └── products_pipeline_schedule.job.yml
+└── src/pipelines/<pipeline_resource_key>/transformations/pipeline.py
 ```
 
-Generated files should not be edited directly. Change `config.json` or a file
+Generated files should not be edited directly. Change `config.yml` or a file
 under `templates/`, then rerun the notebook. The generated bundle folder is
-recreated on every run so removed pipelines cannot leave stale resources behind.
+recreated on every run so removed workflows cannot leave stale resources behind.
 
 ## Source data layout
 
