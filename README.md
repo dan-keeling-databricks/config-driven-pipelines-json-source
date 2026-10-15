@@ -13,11 +13,12 @@ https://github.com/dan-keeling_data/config-driven-pipelines-json-source
 
 Then use this workflow in the Databricks UI:
 
-1. Edit `config.json` in the Git folder.
-2. Open `factory.py`; Databricks recognizes it as a source-format Python notebook.
-3. Attach compute and run the notebook.
-4. Review the regenerated files under `generated/source_system_ingestion_demo/`.
-5. Commit and push the configuration and generated files from the Git folder UI.
+1. Run `upload_mock_data.py` once to create and populate the landing volume.
+2. Edit `config.json` in the Git folder.
+3. Open `factory.py`; Databricks recognizes it as a source-format Python notebook.
+4. Attach compute and run the notebook.
+5. Review the regenerated files under `generated/source_system_ingestion_demo/`.
+6. Commit and push the configuration and generated files from the Git folder UI.
 
 The notebook normally discovers the Git-folder root automatically. If it does
 not, set its `repo_root` widget to the absolute `/Workspace/...` path of the
@@ -63,14 +64,30 @@ generated/source_system_ingestion_demo/
 
 ## Source data layout
 
-For each target, create the configured catalog, schema, and `landing` volume,
-then place source files in these folders:
+This repository represents one source system: JSON files arriving in this Unity
+Catalog managed volume:
 
 ```text
-/Volumes/<catalog>/<schema>/landing/customers/
-/Volumes/<catalog>/<schema>/landing/orders/
-/Volumes/<catalog>/<schema>/landing/products/
+/Volumes/classic_stable_dankeeling_catalog/config-driven-pipelines-demo/landing/
 ```
+
+Its dataset folders are:
+
+```text
+.../landing/customers/
+.../landing/orders/
+.../landing/products/
+```
+
+The checked-in `mock_data/` directory contains newline-delimited JSON batches
+for these folders. Run `upload_mock_data.py` in Databricks to create the source
+schema, development target schema, and volume and copy the files into place.
+The notebook requires `USE CATALOG`, `CREATE SCHEMA`, and `CREATE VOLUME`
+privileges as applicable.
+
+The `dev` bundle target reads that source volume and publishes tables to
+`classic_stable_dankeeling_catalog.config-driven-pipelines-demo-dev`. The `prod`
+target publishes to `classic_stable_dankeeling_catalog.config-driven-pipelines-demo`.
 
 Development schedules are generated as paused. Production schedules are
 generated as unpaused.
@@ -85,5 +102,6 @@ databricks bundle validate --strict -t dev --profile <profile>
 databricks bundle deploy -t dev --profile <profile>
 ```
 
-Deploying the bundle creates the pipeline and job resources; it does not create
-the catalog, schema, volume, or source files.
+Deploying the bundle creates the pipeline and job resources. The separate
+`upload_mock_data.py` notebook creates the source schema and managed volume and
+uploads the mock source files.

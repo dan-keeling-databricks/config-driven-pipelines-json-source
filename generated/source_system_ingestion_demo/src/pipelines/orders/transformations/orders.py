@@ -8,12 +8,15 @@ SOURCE_PATH = spark.conf.get("source_path")
 SOURCE_FORMAT = spark.conf.get("source_format")
 SOURCE_OPTIONS = {'cloudFiles.includeExistingFiles': True,
  'cloudFiles.schemaEvolutionMode': 'addNewColumns',
- 'cloudFiles.schemaHints': 'order_id STRING, customer_id STRING, order_timestamp TIMESTAMP, amount '
-                           'DECIMAL(12,2), status STRING',
+ 'cloudFiles.schemaHints': 'order_id STRING, customer_id STRING, product_id STRING, '
+                           'order_timestamp TIMESTAMP, quantity INT, amount DECIMAL(12,2), status '
+                           'STRING',
  'rescuedDataColumn': '_rescued_data'}
 SILVER_SELECT = ['trim(order_id) AS order_id',
  'trim(customer_id) AS customer_id',
+ 'trim(product_id) AS product_id',
  'order_timestamp',
+ 'quantity',
  'amount',
  'upper(trim(status)) AS status',
  '_ingested_at',
@@ -44,6 +47,8 @@ def bronze_orders():
 @dp.expect_all({'known_order_status': "status IN ('PENDING', 'SHIPPED', 'COMPLETE', 'CANCELLED')"})
 @dp.expect_all_or_drop({'customer_id_present': 'customer_id IS NOT NULL',
  'non_negative_amount': 'amount IS NOT NULL AND amount >= 0',
- 'order_id_present': 'order_id IS NOT NULL'})
+ 'order_id_present': 'order_id IS NOT NULL',
+ 'positive_quantity': 'quantity IS NOT NULL AND quantity > 0',
+ 'product_id_present': 'product_id IS NOT NULL'})
 def silver_orders():
     return spark.readStream.table("bronze_orders").selectExpr(*SILVER_SELECT)

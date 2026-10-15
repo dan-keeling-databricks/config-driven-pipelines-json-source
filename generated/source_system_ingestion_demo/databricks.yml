@@ -8,9 +8,12 @@ include:
 variables:
   catalog:
     description: Unity Catalog catalog containing source and target schemas
-    default: "main"
+    default: "classic_stable_dankeeling_catalog"
   schema:
     description: Schema receiving the bronze and silver tables
+  source_schema:
+    description: Schema containing the source-system landing volume
+    default: "config-driven-pipelines-demo"
   source_volume:
     description: Unity Catalog volume containing dataset landing folders
     default: "landing"
@@ -23,11 +26,11 @@ targets:
     default: true
     mode: development
     variables:
-      schema: "source_system_ingestion_demo_dev"
+      schema: "config-driven-pipelines-demo-dev"
       schedule_pause_status: PAUSED
 
   prod:
     mode: production
     variables:
-      schema: "source_system_ingestion_demo"
+      schema: "config-driven-pipelines-demo"
       schedule_pause_status: UNPAUSED

@@ -1,0 +1,7 @@
+{"product_id":"PROD-009","product_name":"Travel Backpack","category":"outdoors","unit_price":65.00,"active":true}
+{"product_id":"PROD-010","product_name":"Mechanical Keyboard","category":"electronics","unit_price":119.00,"active":true}
+{"product_id":"PROD-011","product_name":"Cedar Candle","category":"home","unit_price":22.00,"active":true}
+{"product_id":"PROD-012","product_name":"Fitness Tracker","category":"electronics","unit_price":149.00,"active":true}
+{"product_id":"PROD-013","product_name":"Rain Jacket","category":"outdoors","unit_price":95.00,"active":true}
+{"product_id":"PROD-014","product_name":"Damaged Price Record","category":null,"unit_price":-10.00,"active":false}
+{"product_id":null,"product_name":"Missing Identifier Record","category":"home","unit_price":12.00,"active":true}

@@ -19,6 +19,7 @@ from typing import Any
 
 
 IDENTIFIER = re.compile(r"^[a-z][a-z0-9_]*$")
+UC_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]*$")
 TOKEN = re.compile(r"\{\{([A-Z][A-Z0-9_]*)\}\}")
 
 
@@ -67,6 +68,12 @@ def validate_identifier(value: Any, field: str) -> str:
     return value
 
 
+def validate_uc_name(value: Any, field: str) -> str:
+    if not isinstance(value, str) or not UC_NAME.fullmatch(value):
+        raise ValueError(f"{field} must match {UC_NAME.pattern!r}; got {value!r}")
+    return value
+
+
 def require_mapping(value: Any, field: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise ValueError(f"{field} must be a JSON object")
@@ -76,13 +83,14 @@ def require_mapping(value: Any, field: str) -> dict[str, Any]:
 def validate_config(config: dict[str, Any]) -> None:
     bundle = require_mapping(config.get("bundle"), "bundle")
     validate_identifier(bundle.get("name"), "bundle.name")
-    validate_identifier(bundle.get("catalog"), "bundle.catalog")
-    validate_identifier(bundle.get("source_volume"), "bundle.source_volume")
+    validate_uc_name(bundle.get("catalog"), "bundle.catalog")
+    validate_uc_name(bundle.get("source_schema"), "bundle.source_schema")
+    validate_uc_name(bundle.get("source_volume"), "bundle.source_volume")
 
     targets = require_mapping(config.get("targets"), "targets")
     for target_name in ("dev", "prod"):
         target = require_mapping(targets.get(target_name), f"targets.{target_name}")
-        validate_identifier(target.get("schema"), f"targets.{target_name}.schema")
+        validate_uc_name(target.get("schema"), f"targets.{target_name}.schema")
         if target.get("schedule_pause_status") not in {"PAUSED", "UNPAUSED"}:
             raise ValueError(
                 f"targets.{target_name}.schedule_pause_status must be PAUSED or UNPAUSED"
@@ -169,6 +177,7 @@ def generate(repo_root: Path) -> Path:
         {
             "BUNDLE_NAME": bundle_name,
             "CATALOG": yaml_string(bundle["catalog"]),
+            "SOURCE_SCHEMA": yaml_string(bundle["source_schema"]),
             "SOURCE_VOLUME": yaml_string(bundle["source_volume"]),
             "DEV_SCHEMA": yaml_string(targets["dev"]["schema"]),
             "DEV_PAUSE_STATUS": targets["dev"]["schedule_pause_status"],

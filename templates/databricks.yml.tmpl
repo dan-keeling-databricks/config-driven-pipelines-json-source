@@ -11,6 +11,9 @@ variables:
     default: {{CATALOG}}
   schema:
     description: Schema receiving the bronze and silver tables
+  source_schema:
+    description: Schema containing the source-system landing volume
+    default: {{SOURCE_SCHEMA}}
   source_volume:
     description: Unity Catalog volume containing dataset landing folders
     default: {{SOURCE_VOLUME}}

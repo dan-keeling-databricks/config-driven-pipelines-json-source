@@ -14,5 +14,5 @@ resources:
         - glob:
             include: ../src/pipelines/products/transformations/**
       configuration:
-        source_path: /Volumes/${var.catalog}/${var.schema}/${var.source_volume}/products
+        source_path: /Volumes/${var.catalog}/${var.source_schema}/${var.source_volume}/products
         source_format: json

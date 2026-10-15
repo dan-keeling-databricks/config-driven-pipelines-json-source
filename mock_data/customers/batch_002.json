@@ -1,0 +1,10 @@
+{"customer_id":"CUST-011","first_name":"kai","last_name":"andersen","email":"kai.andersen@example.com","created_at":"2026-04-12T15:05:00Z"}
+{"customer_id":"CUST-012","first_name":"lucia","last_name":"silva","email":"lucia.silva@example.com","created_at":"2026-05-04T10:40:00Z"}
+{"customer_id":"CUST-013","first_name":"marcus","last_name":"brown","email":"marcus.brown@example.com","created_at":"2026-05-19T18:25:00Z"}
+{"customer_id":"CUST-014","first_name":"nadia","last_name":"haddad","email":"nadia.haddad@example.com","created_at":"2026-06-02T07:50:00Z"}
+{"customer_id":"CUST-015","first_name":"owen","last_name":"hughes","email":"owen.hughes@example.com","created_at":"2026-06-21T13:12:00Z"}
+{"customer_id":"CUST-016","first_name":"priya","last_name":"desai","email":"priya.desai@example.com","created_at":"2026-07-07T09:35:00Z"}
+{"customer_id":"CUST-017","first_name":"quentin","last_name":"leclerc","email":"quentin.leclerc@example.com","created_at":"2026-07-26T16:15:00Z"}
+{"customer_id":"CUST-018","first_name":"ruth","last_name":"adams","email":"ruth.adams@example.com","created_at":"2026-08-09T11:22:00Z"}
+{"customer_id":null,"first_name":"source","last_name":"error","email":"missing.id@example.com","created_at":"2026-09-01T08:00:00Z"}
+{"customer_id":"CUST-020","first_name":"sophia","last_name":"martin","email":"sophia.martin.example.com","created_at":"2026-09-18T14:48:00Z"}
