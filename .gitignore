@@ -1,2 +1,6 @@
 __pycache__/
 *.py[cod]
+
+# Local instructions for coding assistants; not part of the customer demo.
+AGENTS.md
+CLAUDE.md
