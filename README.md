@@ -51,7 +51,6 @@ The output is recreated under:
 ```text
 generated/source_system_ingestion_demo/
 ├── databricks.yml
-├── generated-manifest.json
 ├── resources/
 │   ├── customers.pipeline.yml
 │   ├── customers.job.yml
