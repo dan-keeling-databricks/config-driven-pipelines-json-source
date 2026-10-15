@@ -8,7 +8,7 @@ This project demonstrates a small Databricks notebook factory that turns one
 Create a Databricks Git folder using this repository URL:
 
 ```text
-https://github.com/dan-keeling_data/config-driven-pipelines-json-source
+https://github.com/dan-keeling-databricks/config-driven-pipelines-json-source
 ```
 
 Then use this workflow in the Databricks UI:
