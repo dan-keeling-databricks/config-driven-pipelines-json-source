@@ -15,6 +15,7 @@
 # MAGIC The notebook prints progress as each part of the bundle is created.
 
 # COMMAND ----------
+
 # MAGIC %md
 # MAGIC ## 1. Locate the Git folder
 # MAGIC
@@ -42,6 +43,7 @@ print(f"Configuration   : {CONFIG_PATH}")
 print(f"Templates       : {TEMPLATE_ROOT}")
 
 # COMMAND ----------
+
 # MAGIC %md
 # MAGIC ## 2. Load and inspect `config.yml`
 # MAGIC
@@ -51,29 +53,26 @@ print(f"Templates       : {TEMPLATE_ROOT}")
 
 # COMMAND ----------
 
-# Bundle, resource, and table names become folder names or DAB identifiers.
+# Define regex for a valid name for a Databricks resource
 VALID_NAME = re.compile(r"^[a-z][a-z0-9_]*$")
 
-
+# Define function to load+check a config.yml file
 def load_config() -> dict:
     config = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8"))
 
+    ## VALIDITY CHECKS ##
+    # Check expected sections are present
     required_sections = {"bundle", "source_system", "targets", "workflows"}
     missing_sections = required_sections - config.keys()
     if missing_sections:
         raise ValueError(f"Missing config sections: {sorted(missing_sections)}")
     if not config["workflows"]:
         raise ValueError("At least one workflow is required")
-
+    
+    # Build lists of workflows, pipelines, jobs, tables to ease further checking
     workflow_names = [workflow.get("name", "") for workflow in config["workflows"]]
-    pipeline_keys = [
-        workflow.get("pipeline", {}).get("resource_key", "")
-        for workflow in config["workflows"]
-    ]
-    job_keys = [
-        workflow.get("job", {}).get("resource_key", "")
-        for workflow in config["workflows"]
-    ]
+    pipeline_keys = [workflow.get("pipeline", {}).get("resource_key", "") for workflow in config["workflows"]]
+    job_keys = [workflow.get("job", {}).get("resource_key", "") for workflow in config["workflows"]]
     names = [
         config["bundle"].get("name", ""),
         *workflow_names,
@@ -86,17 +85,20 @@ def load_config() -> dict:
             tables.get(layer, {}).get("name", "") for layer in ("bronze", "silver")
         )
 
+    # Check names against regex
     invalid_names = [name for name in names if not VALID_NAME.fullmatch(name)]
     if invalid_names:
         raise ValueError(f"Invalid bundle, resource, or table names: {invalid_names}")
-
+    
+    # Check name uniqueness
     if len(workflow_names) != len(set(workflow_names)):
         raise ValueError("Workflow names must be unique")
     if len(pipeline_keys) != len(set(pipeline_keys)):
         raise ValueError("Pipeline resource_key values must be unique")
     if len(job_keys) != len(set(job_keys)):
         raise ValueError("Job resource_key values must be unique")
-
+    
+    # Check for valid config
     for workflow in config["workflows"]:
         pipeline = workflow["pipeline"]
         bronze = pipeline["tables"]["bronze"]
@@ -109,15 +111,19 @@ def load_config() -> dict:
                 f"{workflow['name']}: silver.reads_from must equal bronze.name"
             )
 
+    # If checks are fine then config is returned
     return config
 
 
-CONFIG = load_config()
-BUNDLE = CONFIG["bundle"]
-SOURCE_SYSTEM = CONFIG["source_system"]
-TARGETS = CONFIG["targets"]
-WORKFLOWS = CONFIG["workflows"]
+CONFIG = load_config()      # Runs above loader+check function
 
+# Grab useful sub-sections of the CONFIG dictionary
+BUNDLE =        CONFIG["bundle"]
+SOURCE_SYSTEM = CONFIG["source_system"]
+TARGETS =       CONFIG["targets"]
+WORKFLOWS =     CONFIG["workflows"]
+
+# User-friendly print
 print(
     "Source system : "
     f"{SOURCE_SYSTEM['type']} at "
@@ -142,6 +148,7 @@ for workflow in WORKFLOWS:
     )
 
 # COMMAND ----------
+
 # MAGIC %md
 # MAGIC ## 3. Define the small template engine
 # MAGIC
@@ -153,14 +160,15 @@ for workflow in WORKFLOWS:
 
 # COMMAND ----------
 
+# Define what a placeholder value looks like as regex e.g. {{PLACEHOLDER}}
 PLACEHOLDER = re.compile(r"\{\{([A-Z][A-Z0-9_]*)\}\}")
 
-
+# Define function to find & replace in a template using a key:value dictionary
 def populate_template(
     template_name: str,
     placeholder_values: dict[str, str],
 ) -> str:
-    """Load a template and replace its `{{PLACEHOLDER}}` values."""
+    # Load a template and replace its `{{PLACEHOLDER}}` values
     template_path = TEMPLATE_ROOT / f"{template_name}.tmpl"
     text = template_path.read_text(encoding="utf-8")
 
@@ -176,18 +184,18 @@ def populate_template(
 
 
 def write(path: Path, content: str) -> None:
-    """Create parent directories and write one generated file."""
+    # Create parent directories and write one generated file
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content.rstrip() + "\n", encoding="utf-8")
 
 
 def python_literal(value: object) -> str:
-    """Format lists and dictionaries cleanly in generated Python files."""
+    # Format lists and dictionaries cleanly in generated Python files
     return pprint.pformat(value, width=100, sort_dicts=True)
 
 
 def expectations_as_decorators(expectations: dict) -> str:
-    """Convert warn/drop/fail rules into SDP expectation decorators."""
+    # Convert warn/drop/fail rules into SDP expectation decorators
     decorators = {
         "warn": "expect_all",
         "drop": "expect_all_or_drop",
@@ -199,7 +207,7 @@ def expectations_as_decorators(expectations: dict) -> str:
         if expectations.get(action)
     )
 
-
+# Use the .tmpl extension to find the templates
 template_names = sorted(
     path.name.removesuffix(".tmpl") for path in TEMPLATE_ROOT.glob("*.tmpl")
 )
@@ -208,6 +216,7 @@ for template_name in template_names:
     print(f"  • {template_name}")
 
 # COMMAND ----------
+
 # MAGIC %md
 # MAGIC ## 4. Prepare the generated bundle folder
 # MAGIC
@@ -227,6 +236,7 @@ BUNDLE_ROOT.mkdir(parents=True)
 print(f"Created clean bundle folder: {BUNDLE_ROOT}")
 
 # COMMAND ----------
+
 # MAGIC %md
 # MAGIC ## 5. Generate `databricks.yml`
 # MAGIC
@@ -258,14 +268,15 @@ write(BUNDLE_ROOT / "databricks.yml", bundle_yaml)
 print("✓ Generated databricks.yml")
 
 # COMMAND ----------
+
 # MAGIC %md
 # MAGIC ## 6. Generate each configured workflow
 # MAGIC
 # MAGIC For every workflow this cell creates three files:
 # MAGIC
-# MAGIC - A pipeline resource containing one Bronze and one Silver table.
-# MAGIC - A Lakeflow Job resource that runs the pipeline on its configured schedule.
-# MAGIC - A Python transformation file built from the standard Bronze/Silver template.
+# MAGIC - A pipeline yml with the pipeline config and path to the pipeline source code (pipeline.yml)
+# MAGIC - That pipeline source code itself (dataset.py)
+# MAGIC - A Lakeflow Job yml that runs the pipeline on its configured schedule (job.yml)
 # MAGIC
 # MAGIC Auto Loader options, Silver selections, and data-quality expectations are
 # MAGIC inserted from the configuration. Table names are copied exactly as written;
@@ -356,6 +367,7 @@ for workflow in WORKFLOWS:
         print(f"    {path.relative_to(BUNDLE_ROOT)}")
 
 # COMMAND ----------
+
 # MAGIC %md
 # MAGIC ## 7. Review the generated bundle
 # MAGIC
