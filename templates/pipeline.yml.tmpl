@@ -1,18 +1,18 @@
 # GENERATED FILE. Edit config.json or templates, then rerun factory.py.
 resources:
   pipelines:
-    {{PIPELINE_KEY}}:
-      name: "{{DATASET_NAME}} ingestion"
-      catalog: ${var.catalog}
-      schema: ${var.schema}
+    {{RESOURCE_KEY}}:
+      name: {{DISPLAY_NAME}}
+      catalog: ${var.target_catalog}
+      schema: ${var.target_schema}
       serverless: true
       continuous: false
       photon: true
       channel: current
-      root_path: ../src/pipelines/{{DATASET_NAME}}
+      root_path: ../src/pipelines/{{RESOURCE_KEY}}
       libraries:
         - glob:
-            include: ../src/pipelines/{{DATASET_NAME}}/transformations/**
+            include: ../src/pipelines/{{RESOURCE_KEY}}/transformations/**
       configuration:
-        source_path: /Volumes/${var.catalog}/${var.source_schema}/${var.source_volume}/{{SOURCE_SUBPATH}}
-        source_format: {{SOURCE_FORMAT}}
+        source_path: /Volumes/${var.source_catalog}/${var.source_schema}/${var.source_volume}/{{SOURCE_SUBPATH}}
+        source_format: ${var.source_format}

@@ -1,7 +1,7 @@
 # Config-driven Databricks ingestion DAB
 
 This project demonstrates a small Databricks notebook factory that turns one
-`config.json` into a complete Declarative Automation Bundle (DAB).
+readable `config.json` into a complete Declarative Automation Bundle (DAB).
 
 ## Work in the Databricks UI
 
@@ -23,14 +23,63 @@ Then use this workflow in the Databricks UI:
 Because `factory.py` is stored at the repository root, it discovers the Git
 folder automatically when run in Databricks.
 
+## What the configuration describes
+
+The top-level sections have distinct responsibilities:
+
+- `bundle` names the generated DAB.
+- `source_system` identifies the shared JSON landing volume.
+- `targets` identifies each environment's output catalog, schema, and schedule state.
+- `pipelines` lists the independent pipelines and every table each one creates.
+
+Each pipeline follows this visible shape:
+
+```json
+{
+  "resource_key": "customers_pipeline",
+  "display_name": "Customers ingestion",
+  "schedule": {
+    "quartz_cron_expression": "0 0 * * * ?",
+    "timezone_id": "Europe/London"
+  },
+  "tables": {
+    "bronze": {
+      "name": "bronze_customers",
+      "type": "streaming_table",
+      "description": "Raw customer records",
+      "source": {
+        "path": "customers",
+        "schema_hints": "customer_id STRING, ...",
+        "options": {}
+      }
+    },
+    "silver": {
+      "name": "silver_customers",
+      "type": "streaming_table",
+      "description": "Cleansed customer master data",
+      "reads_from": "bronze_customers",
+      "select": ["trim(customer_id) AS customer_id"],
+      "expectations": {
+        "warn": {},
+        "drop": {},
+        "fail": {}
+      }
+    }
+  }
+}
+```
+
+The factory copies `bronze.name`, `silver.name`, and `silver.reads_from`
+directly into the generated pipeline. It does not infer table names.
+
 The initial configuration generates three independent Lakeflow Spark
 Declarative Pipelines:
 
-| Dataset | Tables | Schedule |
+| Pipeline resource | Tables created | Schedule |
 |---|---|---|
-| `customers` | `bronze_customers` → `silver_customers` | Hourly |
-| `orders` | `bronze_orders` → `silver_orders` | Every four hours at :15 |
-| `products` | `bronze_products` → `silver_products` | Daily at 02:30 Europe/London |
+| `customers_pipeline` | `bronze_customers` → `silver_customers` | Hourly |
+| `orders_pipeline` | `bronze_orders` → `silver_orders` | Every four hours at :15 |
+| `products_pipeline` | `bronze_products` → `silver_products` | Daily at 02:30 Europe/London |
 
 Each pipeline has a separate Lakeflow Job resource because schedules are Job
 resources, not pipeline properties.
@@ -50,14 +99,18 @@ The output is recreated under:
 generated/source_system_ingestion_demo/
 ├── databricks.yml
 ├── resources/
-│   ├── customers.pipeline.yml
-│   ├── customers.job.yml
-│   ├── orders.pipeline.yml
-│   ├── orders.job.yml
-│   ├── products.pipeline.yml
-│   └── products.job.yml
-└── src/pipelines/<dataset>/transformations/<dataset>.py
+│   ├── customers_pipeline.pipeline.yml
+│   ├── customers_pipeline.job.yml
+│   ├── orders_pipeline.pipeline.yml
+│   ├── orders_pipeline.job.yml
+│   ├── products_pipeline.pipeline.yml
+│   └── products_pipeline.job.yml
+└── src/pipelines/<resource_key>/transformations/pipeline.py
 ```
+
+Generated files should not be edited directly. Change `config.json` or a file
+under `templates/`, then rerun the notebook. The generated bundle folder is
+recreated on every run so removed pipelines cannot leave stale resources behind.
 
 ## Source data layout
 
@@ -68,7 +121,7 @@ Catalog managed volume:
 /Volumes/classic_stable_dankeeling_catalog/config-driven-pipelines-demo/landing/
 ```
 
-Its dataset folders are:
+Its landing folders are:
 
 ```text
 .../landing/customers/
@@ -85,9 +138,7 @@ privileges as applicable.
 The `dev` bundle target reads that source volume and publishes tables to
 `classic_stable_dankeeling_catalog.config-driven-pipelines-demo-dev`. The `prod`
 target publishes to `classic_stable_dankeeling_catalog.config-driven-pipelines-demo`.
-
-Development schedules are generated as paused. Production schedules are
-generated as unpaused.
+Development schedules are generated as paused; production schedules are active.
 
 ## Validate and deploy
 

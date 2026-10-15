@@ -6,17 +6,22 @@ include:
   - resources/*.yml
 
 variables:
-  catalog:
-    description: Unity Catalog catalog containing source and target schemas
+  source_catalog:
+    description: Unity Catalog catalog containing the landing volume
     default: "classic_stable_dankeeling_catalog"
-  schema:
-    description: Schema receiving the bronze and silver tables
   source_schema:
     description: Schema containing the source-system landing volume
     default: "config-driven-pipelines-demo"
   source_volume:
     description: Unity Catalog volume containing dataset landing folders
     default: "landing"
+  source_format:
+    description: File format used by every feed from this source system
+    default: "json"
+  target_catalog:
+    description: Unity Catalog catalog receiving the bronze and silver tables
+  target_schema:
+    description: Schema receiving the bronze and silver tables
   schedule_pause_status:
     description: Whether generated job schedules are active
     default: PAUSED
@@ -26,11 +31,13 @@ targets:
     default: true
     mode: development
     variables:
-      schema: "config-driven-pipelines-demo-dev"
+      target_catalog: "classic_stable_dankeeling_catalog"
+      target_schema: "config-driven-pipelines-demo-dev"
       schedule_pause_status: PAUSED
 
   prod:
     mode: production
     variables:
-      schema: "config-driven-pipelines-demo"
+      target_catalog: "classic_stable_dankeeling_catalog"
+      target_schema: "config-driven-pipelines-demo"
       schedule_pause_status: UNPAUSED

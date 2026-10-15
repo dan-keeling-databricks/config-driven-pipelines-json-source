@@ -3,7 +3,9 @@ from pyspark import pipelines as dp
 from pyspark.sql import functions as F
 
 
-DATASET_NAME = "{{DATASET_NAME}}"
+BRONZE_TABLE = {{BRONZE_TABLE_REPR}}
+SILVER_TABLE = {{SILVER_TABLE_REPR}}
+SILVER_READS_FROM = {{SILVER_READS_FROM_REPR}}
 SOURCE_PATH = spark.conf.get("source_path")
 SOURCE_FORMAT = spark.conf.get("source_format")
 SOURCE_OPTIONS = {{SOURCE_OPTIONS_REPR}}
@@ -11,10 +13,10 @@ SILVER_SELECT = {{SILVER_SELECT_REPR}}
 
 
 @dp.table(
-    name="bronze_{{DATASET_NAME}}",
-    comment=f"Raw incrementally ingested records for {DATASET_NAME}",
+    name=BRONZE_TABLE,
+    comment={{BRONZE_DESCRIPTION_REPR}},
 )
-def bronze_{{DATASET_NAME}}():
+def ingest_bronze():
     reader = spark.readStream.format("cloudFiles").option("cloudFiles.format", SOURCE_FORMAT)
     for option_name, option_value in SOURCE_OPTIONS.items():
         reader = reader.option(option_name, option_value)
@@ -27,9 +29,9 @@ def bronze_{{DATASET_NAME}}():
 
 
 @dp.table(
-    name="silver_{{DATASET_NAME}}",
-    comment={{DESCRIPTION_REPR}},
+    name=SILVER_TABLE,
+    comment={{SILVER_DESCRIPTION_REPR}},
 )
 {{EXPECTATION_DECORATORS}}
-def silver_{{DATASET_NAME}}():
-    return spark.readStream.table("bronze_{{DATASET_NAME}}").selectExpr(*SILVER_SELECT)
+def cleanse_silver():
+    return spark.readStream.table(SILVER_READS_FROM).selectExpr(*SILVER_SELECT)

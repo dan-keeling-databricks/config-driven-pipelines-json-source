@@ -3,7 +3,9 @@ from pyspark import pipelines as dp
 from pyspark.sql import functions as F
 
 
-DATASET_NAME = "products"
+BRONZE_TABLE = 'bronze_products'
+SILVER_TABLE = 'silver_products'
+SILVER_READS_FROM = 'bronze_products'
 SOURCE_PATH = spark.conf.get("source_path")
 SOURCE_FORMAT = spark.conf.get("source_format")
 SOURCE_OPTIONS = {'cloudFiles.includeExistingFiles': True,
@@ -22,10 +24,10 @@ SILVER_SELECT = ['trim(product_id) AS product_id',
 
 
 @dp.table(
-    name="bronze_products",
-    comment=f"Raw incrementally ingested records for {DATASET_NAME}",
+    name=BRONZE_TABLE,
+    comment='Raw product catalogue records',
 )
-def bronze_products():
+def ingest_bronze():
     reader = spark.readStream.format("cloudFiles").option("cloudFiles.format", SOURCE_FORMAT)
     for option_name, option_value in SOURCE_OPTIONS.items():
         reader = reader.option(option_name, option_value)
@@ -38,11 +40,11 @@ def bronze_products():
 
 
 @dp.table(
-    name="silver_products",
-    comment='Product catalogue data',
+    name=SILVER_TABLE,
+    comment='Cleansed product catalogue data',
 )
 @dp.expect_all({'category_present': 'category IS NOT NULL'})
 @dp.expect_all_or_drop({'non_negative_unit_price': 'unit_price IS NOT NULL AND unit_price >= 0',
  'product_id_present': 'product_id IS NOT NULL'})
-def silver_products():
-    return spark.readStream.table("bronze_products").selectExpr(*SILVER_SELECT)
+def cleanse_silver():
+    return spark.readStream.table(SILVER_READS_FROM).selectExpr(*SILVER_SELECT)

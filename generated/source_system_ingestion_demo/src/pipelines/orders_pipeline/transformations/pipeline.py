@@ -3,7 +3,9 @@ from pyspark import pipelines as dp
 from pyspark.sql import functions as F
 
 
-DATASET_NAME = "orders"
+BRONZE_TABLE = 'bronze_orders'
+SILVER_TABLE = 'silver_orders'
+SILVER_READS_FROM = 'bronze_orders'
 SOURCE_PATH = spark.conf.get("source_path")
 SOURCE_FORMAT = spark.conf.get("source_format")
 SOURCE_OPTIONS = {'cloudFiles.includeExistingFiles': True,
@@ -25,10 +27,10 @@ SILVER_SELECT = ['trim(order_id) AS order_id',
 
 
 @dp.table(
-    name="bronze_orders",
-    comment=f"Raw incrementally ingested records for {DATASET_NAME}",
+    name=BRONZE_TABLE,
+    comment='Raw customer order records',
 )
-def bronze_orders():
+def ingest_bronze():
     reader = spark.readStream.format("cloudFiles").option("cloudFiles.format", SOURCE_FORMAT)
     for option_name, option_value in SOURCE_OPTIONS.items():
         reader = reader.option(option_name, option_value)
@@ -41,8 +43,8 @@ def bronze_orders():
 
 
 @dp.table(
-    name="silver_orders",
-    comment='Customer order data',
+    name=SILVER_TABLE,
+    comment='Cleansed customer order data',
 )
 @dp.expect_all({'known_order_status': "status IN ('PENDING', 'SHIPPED', 'COMPLETE', 'CANCELLED')"})
 @dp.expect_all_or_drop({'customer_id_present': 'customer_id IS NOT NULL',
@@ -50,5 +52,5 @@ def bronze_orders():
  'order_id_present': 'order_id IS NOT NULL',
  'positive_quantity': 'quantity IS NOT NULL AND quantity > 0',
  'product_id_present': 'product_id IS NOT NULL'})
-def silver_orders():
-    return spark.readStream.table("bronze_orders").selectExpr(*SILVER_SELECT)
+def cleanse_silver():
+    return spark.readStream.table(SILVER_READS_FROM).selectExpr(*SILVER_SELECT)
