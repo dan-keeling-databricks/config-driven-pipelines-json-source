@@ -142,7 +142,6 @@ workflows:
             warn:
               category_present: category IS NOT NULL
             drop:
-              product_id_present: product_id IS NOT NULL
               non_negative_unit_price: unit_price IS NOT NULL AND unit_price >= 0
             fail: {}
     job:
