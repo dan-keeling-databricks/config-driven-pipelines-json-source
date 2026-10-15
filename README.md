@@ -20,9 +20,8 @@ Then use this workflow in the Databricks UI:
 5. Review the regenerated files under `generated/source_system_ingestion_demo/`.
 6. Commit and push the configuration and generated files from the Git folder UI.
 
-The notebook normally discovers the Git-folder root automatically. If it does
-not, set its `repo_root` widget to the absolute `/Workspace/...` path of the
-cloned Git folder before running it.
+Because `factory.py` is stored at the repository root, it discovers the Git
+folder automatically when run in Databricks.
 
 The initial configuration generates three independent Lakeflow Spark
 Declarative Pipelines:
@@ -38,9 +37,8 @@ resources, not pipeline properties.
 
 ## Generate the bundle
 
-Open `factory.py` as a Databricks notebook inside a Git folder and run it. The
-optional `repo_root` widget can point at the repository root if the notebook's
-working directory differs. The same file can also be run locally:
+Open `factory.py` as a Databricks notebook inside a Git folder and run all
+cells. The same file can also be run locally:
 
 ```bash
 python3 factory.py
