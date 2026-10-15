@@ -1,0 +1,18 @@
+# GENERATED FILE. Edit config.json or templates, then rerun factory.py.
+resources:
+  pipelines:
+    orders_pipeline:
+      name: "orders ingestion"
+      catalog: ${var.catalog}
+      schema: ${var.schema}
+      serverless: true
+      continuous: false
+      photon: true
+      channel: current
+      root_path: ../src/pipelines/orders
+      libraries:
+        - glob:
+            include: ../src/pipelines/orders/transformations/**
+      configuration:
+        source_path: /Volumes/${var.catalog}/${var.schema}/${var.source_volume}/orders
+        source_format: json

@@ -1,0 +1,15 @@
+# GENERATED FILE. Edit config.json or templates, then rerun factory.py.
+resources:
+  jobs:
+    customers_pipeline_schedule:
+      name: "customers pipeline schedule"
+      max_concurrent_runs: 1
+      schedule:
+        quartz_cron_expression: "0 0 * * * ?"
+        timezone_id: "Europe/London"
+        pause_status: ${var.schedule_pause_status}
+      tasks:
+        - task_key: refresh_customers_pipeline
+          pipeline_task:
+            pipeline_id: ${resources.pipelines.customers_pipeline.id}
+            full_refresh: false

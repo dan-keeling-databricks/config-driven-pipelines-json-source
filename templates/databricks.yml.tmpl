@@ -1,0 +1,33 @@
+# GENERATED FILE. Edit config.json or templates, then rerun factory.py.
+bundle:
+  name: {{BUNDLE_NAME}}
+
+include:
+  - resources/*.yml
+
+variables:
+  catalog:
+    description: Unity Catalog catalog containing source and target schemas
+    default: {{CATALOG}}
+  schema:
+    description: Schema receiving the bronze and silver tables
+  source_volume:
+    description: Unity Catalog volume containing dataset landing folders
+    default: {{SOURCE_VOLUME}}
+  schedule_pause_status:
+    description: Whether generated job schedules are active
+    default: PAUSED
+
+targets:
+  dev:
+    default: true
+    mode: development
+    variables:
+      schema: {{DEV_SCHEMA}}
+      schedule_pause_status: {{DEV_PAUSE_STATUS}}
+
+  prod:
+    mode: production
+    variables:
+      schema: {{PROD_SCHEMA}}
+      schedule_pause_status: {{PROD_PAUSE_STATUS}}

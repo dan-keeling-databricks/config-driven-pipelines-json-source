@@ -1,0 +1,21 @@
+{
+  "bundle_name": "source_system_ingestion_demo",
+  "datasets": [
+    "customers",
+    "orders",
+    "products"
+  ],
+  "files": [
+    "databricks.yml",
+    "resources/customers.job.yml",
+    "resources/customers.pipeline.yml",
+    "resources/orders.job.yml",
+    "resources/orders.pipeline.yml",
+    "resources/products.job.yml",
+    "resources/products.pipeline.yml",
+    "src/pipelines/customers/transformations/customers.py",
+    "src/pipelines/orders/transformations/orders.py",
+    "src/pipelines/products/transformations/products.py"
+  ],
+  "generated_by": "factory.py"
+}

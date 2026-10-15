@@ -1,0 +1,35 @@
+# GENERATED FILE. Edit config.json or templates, then rerun factory.py.
+from pyspark import pipelines as dp
+from pyspark.sql import functions as F
+
+
+DATASET_NAME = "{{DATASET_NAME}}"
+SOURCE_PATH = spark.conf.get("source_path")
+SOURCE_FORMAT = spark.conf.get("source_format")
+SOURCE_OPTIONS = {{SOURCE_OPTIONS_REPR}}
+SILVER_SELECT = {{SILVER_SELECT_REPR}}
+
+
+@dp.table(
+    name="bronze_{{DATASET_NAME}}",
+    comment=f"Raw incrementally ingested records for {DATASET_NAME}",
+)
+def bronze_{{DATASET_NAME}}():
+    reader = spark.readStream.format("cloudFiles").option("cloudFiles.format", SOURCE_FORMAT)
+    for option_name, option_value in SOURCE_OPTIONS.items():
+        reader = reader.option(option_name, option_value)
+
+    return (
+        reader.load(SOURCE_PATH)
+        .withColumn("_ingested_at", F.current_timestamp())
+        .withColumn("_source_file", F.col("_metadata.file_path"))
+    )
+
+
+@dp.table(
+    name="silver_{{DATASET_NAME}}",
+    comment={{DESCRIPTION_REPR}},
+)
+{{EXPECTATION_DECORATORS}}
+def silver_{{DATASET_NAME}}():
+    return spark.readStream.table("bronze_{{DATASET_NAME}}").selectExpr(*SILVER_SELECT)

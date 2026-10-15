@@ -1,0 +1,33 @@
+# GENERATED FILE. Edit config.json or templates, then rerun factory.py.
+bundle:
+  name: source_system_ingestion_demo
+
+include:
+  - resources/*.yml
+
+variables:
+  catalog:
+    description: Unity Catalog catalog containing source and target schemas
+    default: "main"
+  schema:
+    description: Schema receiving the bronze and silver tables
+  source_volume:
+    description: Unity Catalog volume containing dataset landing folders
+    default: "landing"
+  schedule_pause_status:
+    description: Whether generated job schedules are active
+    default: PAUSED
+
+targets:
+  dev:
+    default: true
+    mode: development
+    variables:
+      schema: "source_system_ingestion_demo_dev"
+      schedule_pause_status: PAUSED
+
+  prod:
+    mode: production
+    variables:
+      schema: "source_system_ingestion_demo"
+      schedule_pause_status: UNPAUSED
